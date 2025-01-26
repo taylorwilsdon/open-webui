@@ -43,7 +43,7 @@
 	import { bestMatchingLanguage } from '$lib/utils';
 	import { getAllTags, getChatList } from '$lib/apis/chats';
 	import NotificationToast from '$lib/components/NotificationToast.svelte';
-	import AppControls from '$lib/components/app/AppControls.svelte';
+	import AppSidebar from '$lib/components/app/AppSidebar.svelte';
 
 	setContext('i18n', i18n);
 
@@ -202,13 +202,21 @@
 
 	onMount(async () => {
 		if (window?.electronAPI) {
-			const res = await window.electronAPI.send({
-				type: 'info'
+			const info = await window.electronAPI.send({
+				type: 'app:info'
 			});
 
-			if (res) {
+			if (info) {
 				isApp.set(true);
-				appInfo.set(res);
+				appInfo.set(info);
+
+				const data = await window.electronAPI.send({
+					type: 'app:data'
+				});
+
+				if (data) {
+					appData.set(data);
+				}
 			}
 		}
 
@@ -279,7 +287,7 @@
 				if (localStorage.token) {
 					// Get Session User Info
 					const sessionUser = await getSessionUser(localStorage.token).catch((error) => {
-						toast.error(error);
+						toast.error(`${error}`);
 						return null;
 					});
 
@@ -361,7 +369,7 @@
 {#if loaded}
 	{#if $isApp}
 		<div class="flex flex-row h-screen">
-			<AppControls />
+			<AppSidebar />
 
 			<div class="w-full flex-1 max-w-[calc(100%-4.5rem)]">
 				<slot />

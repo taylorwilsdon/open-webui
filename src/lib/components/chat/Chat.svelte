@@ -44,7 +44,8 @@
 		extractSentencesForAudio,
 		promptTemplate,
 		splitStream,
-		sleep
+		sleep,
+		removeDetailsWithReasoning
 	} from '$lib/utils';
 
 	import { generateChatCompletion } from '$lib/apis/ollama';
@@ -138,6 +139,7 @@
 			files = [];
 			selectedToolIds = [];
 			webSearchEnabled = false;
+			imageGenerationEnabled = false;
 
 			loaded = false;
 
@@ -153,6 +155,7 @@
 						files = input.files;
 						selectedToolIds = input.selectedToolIds;
 						webSearchEnabled = input.webSearchEnabled;
+						imageGenerationEnabled = input.imageGenerationEnabled;
 					} catch (e) {}
 				}
 
@@ -319,6 +322,19 @@
 					eventConfirmationMessage = data.message;
 					eventConfirmationInputPlaceholder = data.placeholder;
 					eventConfirmationInputValue = data?.value ?? '';
+				} else if (type === 'notification') {
+					const toastType = data?.type ?? 'info';
+					const toastContent = data?.content ?? '';
+
+					if (toastType === 'success') {
+						toast.success(toastContent);
+					} else if (toastType === 'error') {
+						toast.error(toastContent);
+					} else if (toastType === 'warning') {
+						toast.warning(toastContent);
+					} else {
+						toast.info(toastContent);
+					}
 				} else {
 					console.log('Unknown message type', data);
 				}
@@ -391,11 +407,13 @@
 				files = input.files;
 				selectedToolIds = input.selectedToolIds;
 				webSearchEnabled = input.webSearchEnabled;
+				imageGenerationEnabled = input.imageGenerationEnabled;
 			} catch (e) {
 				prompt = '';
 				files = [];
 				selectedToolIds = [];
 				webSearchEnabled = false;
+				imageGenerationEnabled = false;
 			}
 		}
 
@@ -697,6 +715,9 @@
 		if ($page.url.searchParams.get('web-search') === 'true') {
 			webSearchEnabled = true;
 		}
+		if ($page.url.searchParams.get('image-generation') === 'true') {
+			imageGenerationEnabled = true;
+		}
 
 		if ($page.url.searchParams.get('tools')) {
 			selectedToolIds = $page.url.searchParams
@@ -831,7 +852,7 @@
 			session_id: $socket?.id,
 			id: responseMessageId
 		}).catch((error) => {
-			toast.error(error);
+			toast.error(`${error}`);
 			messages.at(-1).error = { content: error };
 
 			return null;
@@ -889,7 +910,7 @@
 			session_id: $socket?.id,
 			id: responseMessageId
 		}).catch((error) => {
-			toast.error(error);
+			toast.error(`${error}`);
 			messages.at(-1).error = { content: error };
 			return null;
 		});
@@ -1397,7 +1418,7 @@
 					if ($settings?.memory ?? false) {
 						if (userContext === null) {
 							const res = await queryMemory(localStorage.token, prompt).catch((error) => {
-								toast.error(error);
+								toast.error(`${error}`);
 								return null;
 							});
 							if (res) {
@@ -1483,7 +1504,10 @@
 						}`
 					}
 				: undefined,
-			...createMessagesList(responseMessageId)
+			...createMessagesList(responseMessageId).map((message) => ({
+				...message,
+				content: removeDetailsWithReasoning(message.content)
+			}))
 		]
 			.filter((message) => message?.content?.trim())
 			.map((message, idx, arr) => ({

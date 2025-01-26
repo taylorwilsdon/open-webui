@@ -557,7 +557,7 @@ async def chat_image_generation_handler(
             await __event_emitter__(
                 {
                     "type": "message",
-                    "data": {"content": f"![Generated Image]({image['url']})"},
+                    "data": {"content": f"![Generated Image]({image['url']})\n"},
                 }
             )
 
@@ -671,6 +671,10 @@ def apply_params_to_form_data(form_data, model):
 
         if "frequency_penalty" in params:
             form_data["frequency_penalty"] = params["frequency_penalty"]
+
+        if "reasoning_effort" in params:
+            form_data["reasoning_effort"] = params["reasoning_effort"]
+
     return form_data
 
 
@@ -1072,6 +1076,16 @@ async def process_chat_response(
                         },
                     )
 
+                # We might want to disable this by default
+                detect_reasoning = True
+                reasoning_tags = ["think", "reason", "reasoning", "thought", "Thought"]
+                current_tag = None
+
+                reasoning_start_time = None
+
+                reasoning_content = ""
+                ongoing_content = ""
+
                 async for line in response.body_iterator:
                     line = line.decode("utf-8") if isinstance(line, bytes) else line
                     data = line
@@ -1098,7 +1112,6 @@ async def process_chat_response(
                                     "selectedModelId": data["selected_model_id"],
                                 },
                             )
-
                         else:
                             value = (
                                 data.get("choices", [])[0]
@@ -1108,6 +1121,73 @@ async def process_chat_response(
 
                             if value:
                                 content = f"{content}{value}"
+
+                                if detect_reasoning:
+                                    for tag in reasoning_tags:
+                                        start_tag = f"<{tag}>\n"
+                                        end_tag = f"</{tag}>\n"
+
+                                        if start_tag in content:
+                                            # Remove the start tag
+                                            content = content.replace(start_tag, "")
+                                            ongoing_content = content
+
+                                            reasoning_start_time = time.time()
+                                            reasoning_content = ""
+
+                                            current_tag = tag
+                                            break
+
+                                    if reasoning_start_time is not None:
+                                        # Remove the last value from the content
+                                        content = content[: -len(value)]
+
+                                        reasoning_content += value
+
+                                        end_tag = f"</{current_tag}>\n"
+                                        if end_tag in reasoning_content:
+                                            reasoning_end_time = time.time()
+                                            reasoning_duration = int(
+                                                reasoning_end_time
+                                                - reasoning_start_time
+                                            )
+                                            reasoning_content = (
+                                                reasoning_content.strip(
+                                                    f"<{current_tag}>\n"
+                                                )
+                                                .strip(end_tag)
+                                                .strip()
+                                            )
+
+                                            if reasoning_content:
+                                                reasoning_display_content = "\n".join(
+                                                    (
+                                                        f"> {line}"
+                                                        if not line.startswith(">")
+                                                        else line
+                                                    )
+                                                    for line in reasoning_content.splitlines()
+                                                )
+
+                                                # Format reasoning with <details> tag
+                                                content = f'{ongoing_content}<details type="reasoning" done="true" duration="{reasoning_duration}">\n<summary>Thought for {reasoning_duration} seconds</summary>\n{reasoning_display_content}\n</details>\n'
+                                            else:
+                                                content = ""
+
+                                            reasoning_start_time = None
+                                        else:
+
+                                            reasoning_display_content = "\n".join(
+                                                (
+                                                    f"> {line}"
+                                                    if not line.startswith(">")
+                                                    else line
+                                                )
+                                                for line in reasoning_content.splitlines()
+                                            )
+
+                                            # Show ongoing thought process
+                                            content = f'{ongoing_content}<details type="reasoning" done="false">\n<summary>Thinking…</summary>\n{reasoning_display_content}\n</details>\n'
 
                                 if ENABLE_REALTIME_CHAT_SAVE:
                                     # Save message in the database
@@ -1129,10 +1209,8 @@ async def process_chat_response(
                                 "data": data,
                             }
                         )
-
                     except Exception as e:
                         done = "data: [DONE]" in line
-
                         if done:
                             pass
                         else:
