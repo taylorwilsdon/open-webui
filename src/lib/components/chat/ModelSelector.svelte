@@ -23,7 +23,7 @@
 		const url = new URL(window.location.href);
 		url.searchParams.set('model', selectedModels);
 		navigator.clipboard.writeText(url.toString());
-		toast.success($i18n.t('Link copied to clipboard'));
+		toast.success($i18n.t('Copied to clipboard'));
 	};
 
 	const saveDefaultModel = async () => {
