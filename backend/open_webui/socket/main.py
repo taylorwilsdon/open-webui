@@ -15,6 +15,7 @@ from open_webui.utils.redis import (
 
 from open_webui.env import (
     ENABLE_WEBSOCKET_SUPPORT,
+    ENABLE_USER_POOL_EVENTS,
     WEBSOCKET_MANAGER,
     WEBSOCKET_REDIS_URL,
     WEBSOCKET_REDIS_LOCK_TIMEOUT,
@@ -191,7 +192,8 @@ async def connect(sid, environ, auth):
                 USER_POOL[user.id] = [sid]
 
             # print(f"user {user.name}({user.id}) connected with session ID {sid}")
-            await sio.emit("user-list", {"user_ids": list(USER_POOL.keys())})
+            if ENABLE_USER_POOL_EVENTS:
+                await sio.emit("user-list", {"user_ids": list(USER_POOL.keys())})
             await sio.emit("usage", {"models": get_models_in_use()})
 
 
@@ -224,7 +226,8 @@ async def user_join(sid, data):
 
     # print(f"user {user.name}({user.id}) connected with session ID {sid}")
 
-    await sio.emit("user-list", {"user_ids": list(USER_POOL.keys())})
+    if ENABLE_USER_POOL_EVENTS:
+        await sio.emit("user-list", {"user_ids": list(USER_POOL.keys())})
     return {"id": user.id, "name": user.name}
 
 
@@ -280,7 +283,8 @@ async def channel_events(sid, data):
 @sio.on("user-list")
 async def user_list(sid):
     if sid in SESSION_POOL:
-        await sio.emit("user-list", {"user_ids": list(USER_POOL.keys())})
+        if ENABLE_USER_POOL_EVENTS:
+            await sio.emit("user-list", {"user_ids": list(USER_POOL.keys())})
 
 
 @sio.event
@@ -295,7 +299,8 @@ async def disconnect(sid):
         if len(USER_POOL[user_id]) == 0:
             del USER_POOL[user_id]
 
-        await sio.emit("user-list", {"user_ids": list(USER_POOL.keys())})
+        if ENABLE_USER_POOL_EVENTS:
+            await sio.emit("user-list", {"user_ids": list(USER_POOL.keys())})
     else:
         pass
         # print(f"Unknown session ID {sid} disconnected")
