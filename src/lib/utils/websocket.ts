@@ -1,7 +1,8 @@
 import { io } from 'socket.io-client';
 
-import { socket, activeUserIds, USAGE_POOL } from '$lib/stores';
+import { socket, activeUserIds, USAGE_POOL, config } from '$lib/stores';
 import { WEBUI_BASE_URL } from '$lib/constants';
+import { get } from 'svelte/store';
 
 export const setupSocket = async (enableWebsocket) => {
 	const _socket = io(`${WEBUI_BASE_URL}` || undefined, {
@@ -39,10 +40,12 @@ export const setupSocket = async (enableWebsocket) => {
 		}
 	});
 
-	_socket.on('user-list', (data) => {
-		console.log('user-list', data);
-		activeUserIds.set(data.user_ids);
-	});
+	if (get(config)?.features?.enable_user_pool_events) {
+		_socket.on('user-list', (data) => {
+			console.log('user-list', data);
+			activeUserIds.set(data.user_ids);
+		});
+	}
 
 	_socket.on('usage', (data) => {
 		console.log('usage', data);

@@ -400,6 +400,10 @@ ENABLE_WEBSOCKET_SUPPORT = (
     os.environ.get("ENABLE_WEBSOCKET_SUPPORT", "True").lower() == "true"
 )
 
+ENABLE_USER_POOL_EVENTS = (
+    os.environ.get("ENABLE_USER_POOL_EVENTS", "True").lower() == "true"
+)
+
 WEBSOCKET_MANAGER = os.environ.get("WEBSOCKET_MANAGER", "")
 
 WEBSOCKET_REDIS_URL = os.environ.get("WEBSOCKET_REDIS_URL", REDIS_URL)
